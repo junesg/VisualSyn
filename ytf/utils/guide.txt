@@ -1,0 +1,5 @@
+This folder contains common utilities such as
+
+- GradCheck (gradient check)
+- minFunc (unconstrained minimizer toolbox)
+- ...
