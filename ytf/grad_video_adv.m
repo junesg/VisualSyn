@@ -1,18 +1,24 @@
-function [ grad, cost ] = grad_video(net, pars, X, Id)
+function [ grad, cost ] = grad_video_adv(net, pars, X, Id)
 
 numdata = size(X,2);
 grad = struct;
 
-Hid_id = bsxfun(@plus, net.vis_to_hid_id*X, net.bias_hid_id);
-Hid_id = relu(Hid_id);
-
 Hid_var = bsxfun(@plus, net.vis_to_hid_var*X, net.bias_hid_var);
 Hid_var = relu(Hid_var);
 
-Id_pred = softmax(net.hid_id_to_id, Hid_id);
+Hid_id = bsxfun(@plus, net.vis_to_hid_id*X, net.bias_hid_id);
+Hid_id = relu(Hid_id);
+
+Id_pred_id = softmax(net.hid_id_to_id, Hid_id);
 
 Var = net.hid_var_to_var*Hid_var;
-%Var = relu(Var);
+if strcmp(pars.enc,'sigmoid')
+    Var = sigmoid(Var);
+elseif strcmp(pars.enc,'relu'),
+    Var = relu(Var);
+end
+
+Id_pred_var = softmax(net.var_to_id, Var);
 
 Hid = bsxfun(@plus, net.id_to_hid*Id, net.bias_hid);
 Hid = Hid + net.var_to_hid*Var;
@@ -24,45 +30,30 @@ Recon = bsxfun(@plus, net.hid_to_vis*Hid, net.bias_vis);
 err_recon = Recon - X;
 cost_recon = 0.5*err_recon(:)'*err_recon(:) / numdata;
 
-delta = err_recon / numdata;
+delta_recon = err_recon / numdata;
 
-grad.bias_vis = sum(delta, 2);
-grad.hid_to_vis = delta*Hid';
+grad.bias_vis = sum(delta_recon, 2);
+grad.hid_to_vis = delta_recon*Hid';
 
-delta = net.hid_to_vis'*delta;
-delta = delta.*(Hid > 0);
+delta_recon = net.hid_to_vis'*delta_recon;
+delta_recon = delta_recon.*(Hid > 0);
 
-grad.bias_hid = sum(delta,2);
-%grad.id_to_hid = delta*Id_pred';
-grad.id_to_hid = delta*Id';
-grad.var_to_hid = delta*Var';
+grad.bias_hid = sum(delta_recon,2);
+grad.id_to_hid = delta_recon*Id';
+grad.var_to_hid = delta_recon*Var';
 
-%{
-delta_id = net.id_to_hid'*delta;
-
-% backprop through softmax.
-delta_tmp = 0*delta_id;
-for i = 1:pars.numid,
-    delta_tmp(i,:) = delta_tmp(i,:) + ...
-        delta_id(i,:).*Id_pred(i,:).*(1-Id_pred(i,:));
-    for j = 1:pars.numid,
-        if (i==j),
-            continue;
-        end
-        delta_tmp(i,:) =  delta_tmp(i,:) - ...
-            delta_id(j,:).*(Id_pred(i,:).*Id_pred(j,:));
-    end
-end
-delta_id = delta_tmp;
-%}
-
-%% Add in ID prediction gradient.
+%% Add in ID prediction gradient from id.
 small = 1e-9;
-err_pred = -pars.lambda * (Id.*log(Id_pred + small));
-cost_pred = sum(sum(err_pred)) / numdata;
-delta_pred = -pars.lambda*(Id - Id_pred) / numdata;
+err_pred_id = -pars.lambda * (Id.*log(Id_pred_id + small));
+cost_pred_id = sum(sum(err_pred_id)) / numdata;
+delta_pred_id = -pars.lambda*(Id - Id_pred_id) / numdata;
+delta_id = delta_pred_id;
 
-delta_id = delta_pred;
+%% Add in ID prediction gradient from var.
+small = 1e-9;
+err_pred_var = pars.lambda * (Id.*log(Id_pred_var + small));
+cost_pred_var = sum(sum(err_pred_var)) / numdata;
+delta_pred_var = pars.lambda*(Id - Id_pred_var) / numdata;
 
 %% Continue backprop both gradients.
 grad.hid_id_to_id = delta_id*Hid_id';
@@ -74,8 +65,12 @@ grad.bias_hid_id = sum(delta_id,2);
 grad.vis_to_hid_id = delta_id*X';
 
 % Backprop var.
-delta_var = net.var_to_hid'*delta;
-%delta_var = delta_var.*(Var > 0);
+delta_var = net.var_to_hid'*delta_recon + net.var_to_id'*delta_pred_var;
+if strcmp(pars.enc,'sigmoid')
+    delta_var = delta_var.*(Var.*(1-Var));
+elseif strcmp(pars.enc,'relu'),
+    delta_var = delta_var.*(Var>0);
+end
 
 grad.hid_var_to_var = delta_var*Hid_var';
 delta_var = net.hid_var_to_var'*delta_var;
@@ -90,10 +85,12 @@ cost_l2r = 0.5*pars.l2reg*(net.vis_to_hid_id(:)'*net.vis_to_hid_id(:) + ...
                 net.hid_var_to_var(:)'*net.hid_var_to_var(:) + ...
                 net.id_to_hid(:)'*net.id_to_hid(:) + ...
                 net.var_to_hid(:)'*net.var_to_hid(:) + ...
-                net.hid_to_vis(:)'*net.hid_to_vis(:));
+                net.hid_to_vis(:)'*net.hid_to_vis(:) + ...
+                net.var_to_id(:)'*net.var_to_id(:));
 
-cost = cost_pred + cost_recon + cost_l2r;
+cost = cost_pred_id + cost_pred_var + cost_recon + cost_l2r;
 
+grad.var_to_id = pars.l2reg*net.var_to_id;
 grad.vis_to_hid_id = grad.vis_to_hid_id + pars.l2reg*net.vis_to_hid_id;
 grad.vis_to_hid_var = grad.vis_to_hid_var + pars.l2reg*net.vis_to_hid_var;
 grad.hid_id_to_id = grad.hid_id_to_id + pars.l2reg*net.hid_id_to_id;
