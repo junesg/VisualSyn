@@ -38,7 +38,7 @@ trainidx = folds(:,fold)==1;
 validx = folds(:,fold)==2;
 testidx = folds(:,fold)==3;
 
-% Train model.
+%% Train model.
 Xtrain = data(:,trainidx);
 Ytrain = labs_id(trainidx);
 Etrain = labs_ex(trainidx);
@@ -56,7 +56,11 @@ pairs_test = makepairs(Ytest);
 disp('Done.');
 
 %% Evaluation.
-model = load('results/tfd_nv2304_id500_var500_l2r0.0001_eps0.01_maxit100_20150104T193808.mat');
+%model = load('results/tfd_nv2304_id500_var500_l2r0.0001_eps0.01_maxit100_20150104T193808.mat');
+%model = load('results/tfd_nv2304_id10_var10_l2r0.0001_eps0.01_maxit100_20150104T213441.mat');
+%model = load('results/tfd_nv2304_id10_var10_l2r0.0001_eps0.01_maxit100_20150104T213250.mat');
+%model = load('results/tfd_nv2304_id20_var20_l2r0.0001_eps0.01_maxit100_20150104T231841.mat');
+model = load('results/tfd_nv2304_id10_var10_l2r0.0001_eps0.01_maxit100_20150105T000224.mat');
 net = model.weights;
 pars = model.params;
 
@@ -64,7 +68,7 @@ pars = model.params;
 [ IdVal, VarVal, ~ ] = net_ff_siamese(net, Xval, pars);
 [ IdTest, VarTest, ~ ] = net_ff_siamese(net, Xtest, pars);
 
-Clist = [ 0.1 ];
+Clist = [ 10 ];
 
 % ID -> Var
 [acc_val_id2var, acc_test_id2var] = eval_cls(Clist, IdTrain, Etrain, IdVal, Eval, IdTest, Etest);

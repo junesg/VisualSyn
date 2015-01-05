@@ -1,30 +1,42 @@
-function [ Id1, Var1, Recon ] = net_ff_siamese(net, X1, pars)
+function [ Id, Var, Recon ] = net_ff_siamese(net, X, pars)
 
-% Var inference.
-Hid_var1 = bsxfun(@plus, net.vis_to_hid_var*X1, net.bias_hid_var);
-Hid_var1 = relu(Hid_var1);
-Var1 = net.hid_var_to_var*Hid_var1;
+HidId1 = bsxfun(@plus, net.vis_to_hid_id1*X, net.bias_hid_id1);
+if ~pars.gradcheck,
+    HidId1 = relu(HidId1);
+end
+HidId2 = bsxfun(@plus, net.hid_id1_to_hid_id2*HidId1, net.bias_hid_id2);
+if ~pars.gradcheck,
+    HidId2 = relu(HidId2);
+end
+Id = net.hid_id2_to_id*HidId2;
 if strcmp(pars.enc,'sigmoid')
-    Var1 = sigmoid(Var1);
+    Id = sigmoid(Id);
 elseif strcmp(pars.enc,'relu'),
-    Var1 = relu(Var1);
+    Id = relu(Id);
 end
 
-% ID inference.
-Hid_id1 = bsxfun(@plus, net.vis_to_hid_id*X1, net.bias_hid_id);
-Hid_id1 = relu(Hid_id1);
-Id1 = net.hid_id_to_id*Hid_id1;
+HidVar1 = bsxfun(@plus, net.vis_to_hid_var1*X, net.bias_hid_var1);
+if ~pars.gradcheck,
+    HidVar1 = relu(HidVar1);
+end
+HidVar2 = bsxfun(@plus, net.hid_var1_to_hid_var2*HidVar1, net.bias_hid_var2);
+if ~pars.gradcheck,
+    HidVar2 = relu(HidVar2);
+end
+Var = net.hid_var2_to_var*HidVar2;
 if strcmp(pars.enc,'sigmoid')
-    Id1 = sigmoid(Id1);
+    Var = sigmoid(Var);
 elseif strcmp(pars.enc,'relu'),
-    Id1 = relu(Id1);
+    Var = relu(Var);
 end
 
-%% Reconstruction inference.
-Hid = bsxfun(@plus, net.id_to_hid*Id1, net.bias_hid);
-Hid = Hid + net.var_to_hid*Var1;
+Hid1 = bsxfun(@plus, net.id_to_hid1*Id, net.bias_hid1);
+Hid1 = Hid1 + net.var_to_hid1*Var;
+Hid1 = relu(Hid1);
+
+Hid = bsxfun(@plus, net.hid1_to_hid2*Hid1, net.bias_hid2);
 Hid = relu(Hid);
 
-Recon = bsxfun(@plus, net.hid_to_vis*Hid, net.bias_vis);
+Recon = bsxfun(@plus, net.hid2_to_vis*Hid, net.bias_vis);
 
 end

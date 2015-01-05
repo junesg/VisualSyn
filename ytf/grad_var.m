@@ -4,24 +4,31 @@ numdata = size(X1,2);
 grad = struct;
 
 X = { X1, X2, X3 };
-HidId = cell(3,1);
+HidId1 = cell(3,1);
+HidId2 = cell(3,1);
 Id = cell(3,1);
 DeltaAdvId = cell(3,1);
-HidVar = cell(3,1);
+HidVar1 = cell(3,1);
+HidVar2 = cell(3,1);
 Var = cell(3,1);
 DeltaAdvVar = cell(3,1);
 DeltaIdPred = cell(3,1);
-HidRecon = cell(3,1);
+HidRecon1 = cell(3,1);
+HidRecon2 = cell(3,1);
 Recon = cell(3,1);
 DeltaRecon = cell(3,1);
 
 %% Feed-forward ID.
 for i = 1:3,
-    HidId{i} = bsxfun(@plus, net.vis_to_hid_id*X{i}, net.bias_hid_id);
+    HidId1{i} = bsxfun(@plus, net.vis_to_hid_id1*X{i}, net.bias_hid_id1);
     if ~pars.gradcheck,
-        HidId{i} = relu(HidId{i});
+        HidId1{i} = relu(HidId1{i});
     end
-    Id{i} = net.hid_id_to_id*HidId{i};
+    HidId2{i} = bsxfun(@plus, net.hid_id1_to_hid_id2*HidId1{i}, net.bias_hid_id2);
+    if ~pars.gradcheck,
+        HidId2{i} = relu(HidId2{i});
+    end
+    Id{i} = net.hid_id2_to_id*HidId2{i};
     if strcmp(pars.enc,'sigmoid')
         Id{i} = sigmoid(Id{i});
     elseif strcmp(pars.enc,'relu'),
@@ -31,11 +38,15 @@ end
 
 %% Feed-forward Var.
 for i = 1:3,
-    HidVar{i} = bsxfun(@plus, net.vis_to_hid_var*X{i}, net.bias_hid_var);
+    HidVar1{i} = bsxfun(@plus, net.vis_to_hid_var1*X{i}, net.bias_hid_var1);
     if ~pars.gradcheck,
-        HidVar{i} = relu(HidVar{i});
+        HidVar1{i} = relu(HidVar1{i});
     end
-    Var{i} = net.hid_var_to_var*HidVar{i};
+    HidVar2{i} = bsxfun(@plus, net.hid_var1_to_hid_var2*HidVar1{i}, net.bias_hid_var2);
+    if ~pars.gradcheck,
+        HidVar2{i} = relu(HidVar2{i});
+    end
+    Var{i} = net.hid_var2_to_var*HidVar2{i};
     if strcmp(pars.enc,'sigmoid')
         Var{i} = sigmoid(Var{i});
     elseif strcmp(pars.enc,'relu'),
@@ -108,38 +119,49 @@ end
 
 %% Cost reconstruction.
 cost_recon = 0;
-grad.hid_to_vis = 0*net.hid_to_vis;
-grad.bias_hid = 0*net.bias_hid;
+grad.hid1_to_hid2 = 0*net.hid1_to_hid2;
+grad.hid2_to_vis = 0*net.hid2_to_vis;
+grad.bias_hid1 = 0*net.bias_hid1;
+grad.bias_hid2 = 0*net.bias_hid2;
 grad.bias_vis = 0*net.bias_vis;
-grad.var_to_hid = 0*net.var_to_hid;
-grad.id_to_hid = 0*net.id_to_hid;
+grad.var_to_hid1 = 0*net.var_to_hid1;
+grad.id_to_hid1 = 0*net.id_to_hid1;
 for i = 1:3,
-    HidRecon{i} = bsxfun(@plus, net.id_to_hid*Id{i}, net.bias_hid);
-    HidRecon{i} = HidRecon{i} + net.var_to_hid*Var{i};
+    HidRecon1{i} = bsxfun(@plus, net.id_to_hid1*Id{i}, net.bias_hid1);
+    HidRecon1{i} = HidRecon1{i} + net.var_to_hid1*Var{i};
     if ~pars.gradcheck,
-        HidRecon{i} = relu(HidRecon{i});
+        HidRecon1{i} = relu(HidRecon1{i});
     end
-    Recon{i} = bsxfun(@plus, net.hid_to_vis*HidRecon{i}, net.bias_vis);
+    HidRecon2{i} = bsxfun(@plus, net.hid1_to_hid2*HidRecon1{i}, net.bias_hid2);
+    if ~pars.gradcheck,
+        HidRecon2{i} = relu(HidRecon2{i});
+    end
+    Recon{i} = bsxfun(@plus, net.hid2_to_vis*HidRecon2{i}, net.bias_vis);
     err = Recon{i} - X{i};
     cost_recon = cost_recon + 0.5*pars.lambda*(err(:)'*err(:)) / numdata;
     DeltaRecon{i} = pars.lambda * err / numdata;
     grad.bias_vis = grad.bias_vis + sum(DeltaRecon{i},2);
-    grad.hid_to_vis = grad.hid_to_vis + DeltaRecon{i}*HidRecon{i}';
-    DeltaRecon{i} = net.hid_to_vis'*DeltaRecon{i};
+    grad.hid2_to_vis = grad.hid2_to_vis + DeltaRecon{i}*HidRecon2{i}';
+    DeltaRecon{i} = net.hid2_to_vis'*DeltaRecon{i};
     if ~pars.gradcheck,
-        DeltaRecon{i} = DeltaRecon{i}.*(HidRecon{i} > 0);
+        DeltaRecon{i} = DeltaRecon{i}.*(HidRecon2{i} > 0);
     end
-    grad.bias_hid = grad.bias_hid + sum(DeltaRecon{i},2);
-    grad.id_to_hid = grad.id_to_hid + DeltaRecon{i}*Id{i}';
-    grad.var_to_hid = grad.var_to_hid + DeltaRecon{i}*Var{i}';
+    grad.bias_hid2 = grad.bias_hid2 + sum(DeltaRecon{i},2);
+    grad.hid1_to_hid2 = grad.hid1_to_hid2 + DeltaRecon{i}*HidRecon1{i}';
+    DeltaRecon{i} = net.hid1_to_hid2'*DeltaRecon{i};
+    if ~pars.gradcheck,
+        DeltaRecon{i} = DeltaRecon{i}.*(HidRecon1{i} > 0);
+    end
+    grad.id_to_hid1 = grad.id_to_hid1 + DeltaRecon{i}*Id{i}';
+    grad.var_to_hid1 = grad.var_to_hid1 + DeltaRecon{i}*Var{i}';
 end
 
 %% Backprop all gradients.
 DeltaId = cell(3,1);
 DeltaVar = cell(3,1);
 for i = 1:3,
-    DeltaId{i} = DeltaAdvId{i} + DeltaIdPred{i} + net.id_to_hid'*DeltaRecon{i};
-    DeltaVar{i} = DeltaAdvVar{i} + net.var_to_hid'*DeltaRecon{i};
+    DeltaId{i} = DeltaAdvId{i} + DeltaIdPred{i} + net.id_to_hid1'*DeltaRecon{i};
+    DeltaVar{i} = DeltaAdvVar{i} + net.var_to_hid1'*DeltaRecon{i};
     if strcmp(pars.enc,'sigmoid'),
         DeltaId{i} = DeltaId{i}.*(Id{i}.*(1-Id{i}));
     elseif strcmp(pars.enc, 'relu'),
@@ -148,52 +170,74 @@ for i = 1:3,
 end
 
 % ID pathway.
-grad.hid_id_to_id = 0*net.hid_id_to_id;
-grad.bias_hid_id = 0*net.bias_hid_id;
-grad.vis_to_hid_id = 0*net.vis_to_hid_id;
-for i = 1:3,
-    grad.hid_id_to_id = grad.hid_id_to_id + DeltaId{i} * HidId{i}';
-    DeltaId{i} = net.hid_id_to_id'*DeltaId{i};
+grad.hid_id2_to_id = 0*net.hid_id2_to_id;
+grad.bias_hid_id2 = 0*net.bias_hid_id2;
+grad.hid_id1_to_hid_id2 = 0*net.hid_id1_to_hid_id2;
+grad.bias_hid_id1 = 0*net.bias_hid_id1;
+grad.vis_to_hid_id1 = 0*net.vis_to_hid_id1;
+for i = 1:3,    
+    grad.hid_id2_to_id = grad.hid_id2_to_id + DeltaId{i} * HidId2{i}';
+    DeltaId{i} = net.hid_id2_to_id'*DeltaId{i};
     if ~pars.gradcheck,
-        DeltaId{i} = DeltaId{i}.*(HidId{i} > 0);
+        DeltaId{i} = DeltaId{i}.*(HidId2{i} > 0);
     end
-    grad.bias_hid_id = grad.bias_hid_id + sum(DeltaId{i},2);
-    grad.vis_to_hid_id = grad.vis_to_hid_id + DeltaId{i}*X{i}';
+    grad.bias_hid_id2 = grad.bias_hid_id2 + sum(DeltaId{i},2);
+    grad.hid_id1_to_hid_id2 = grad.hid_id1_to_hid_id2 + DeltaId{i}*HidId1{i}';
+    DeltaId{i} = net.hid_id1_to_hid_id2'*DeltaId{i};
+    if ~pars.gradcheck,
+        DeltaId{i} = DeltaId{i}.*(HidId1{i} > 0);
+    end
+    grad.bias_hid_id1 = grad.bias_hid_id1 + sum(DeltaId{i},2);
+    grad.vis_to_hid_id1 = grad.vis_to_hid_id1 + DeltaId{i}*X{i}';
 end
 
 % Var pathway.
-grad.hid_var_to_var = 0*net.hid_var_to_var;
-grad.bias_hid_var = 0*net.bias_hid_var;
-grad.vis_to_hid_var = 0*net.vis_to_hid_var;
+grad.hid_var2_to_var = 0*net.hid_var2_to_var;
+grad.bias_hid_var2 = 0*net.bias_hid_var2;
+grad.hid_var1_to_hid_var2 = 0*net.hid_var1_to_hid_var2;
+grad.bias_hid_var1 = 0*net.bias_hid_var1;
+grad.vis_to_hid_var1 = 0*net.vis_to_hid_var1;
 for i = 1:3,
-    grad.hid_var_to_var = grad.hid_var_to_var + DeltaVar{i} * HidVar{i}';
-    DeltaVar{i} = net.hid_var_to_var'*DeltaVar{i};
+    grad.hid_var2_to_var = grad.hid_var2_to_var + DeltaVar{i} * HidVar2{i}';
+    DeltaVar{i} = net.hid_var2_to_var'*DeltaVar{i};
     if ~pars.gradcheck,
-        DeltaVar{i} = DeltaVar{i}.*(HidVar{i} > 0);
+        DeltaVar{i} = DeltaVar{i}.*(HidVar2{i} > 0);
     end
-    grad.bias_hid_var = grad.bias_hid_var + sum(DeltaVar{i},2);
-    grad.vis_to_hid_var = grad.vis_to_hid_var + DeltaVar{i}*X{i}';
+    grad.bias_hid_var2 = grad.bias_hid_var2 + sum(DeltaVar{i},2);
+    grad.hid_var1_to_hid_var2 = grad.hid_var1_to_hid_var2 + DeltaVar{i}*HidVar1{i}';
+    DeltaVar{i} = net.hid_id1_to_hid_id2'*DeltaVar{i};
+    if ~pars.gradcheck,
+        DeltaVar{i} = DeltaVar{i}.*(HidVar1{i} > 0);
+    end
+    grad.bias_hid_var1 = grad.bias_hid_var1 + sum(DeltaVar{i},2);
+    grad.vis_to_hid_var1 = grad.vis_to_hid_var1 + DeltaVar{i}*X{i}';
 end
 
 %% L2 regularization.
-cost_l2r = 0.5*pars.l2reg*(net.vis_to_hid_id(:)'*net.vis_to_hid_id(:) + ...
-                           net.vis_to_hid_var(:)'*net.vis_to_hid_var(:) + ...
-                           net.hid_id_to_id(:)'*net.hid_id_to_id(:) + ...
-                           net.hid_var_to_var(:)'*net.hid_var_to_var(:) + ...
-                           net.id_to_hid(:)'*net.id_to_hid(:) + ...
+cost_l2r = 0.5*pars.l2reg*(net.vis_to_hid_id1(:)'*net.vis_to_hid_id1(:) + ...
+                           net.hid_id1_to_hid_id2(:)'*net.hid_id1_to_hid_id2(:) + ...
+                           net.vis_to_hid_var1(:)'*net.vis_to_hid_var1(:) + ...
+                           net.hid_var1_to_hid_var2(:)'*net.hid_var1_to_hid_var2(:) + ...
+                           net.hid_id2_to_id(:)'*net.hid_id2_to_id(:) + ...
+                           net.hid_var2_to_var(:)'*net.hid_var2_to_var(:) + ...
+                           net.id_to_hid1(:)'*net.id_to_hid1(:) + ...
                            net.id_pred(:)'*net.id_pred(:) + ...
-                           net.var_to_hid(:)'*net.var_to_hid(:) + ...
-                           net.hid_to_vis(:)'*net.hid_to_vis(:));
+                           net.var_to_hid1(:)'*net.var_to_hid1(:) + ...
+                           net.hid1_to_hid2(:)'*net.hid1_to_hid2(:) + ...
+                           net.hid2_to_vis(:)'*net.hid2_to_vis(:));
 
 cost = cost_adv_id + cost_adv_var + cost_id_pred + cost_l2r + cost_recon;
 
-grad.vis_to_hid_id = grad.vis_to_hid_id + pars.l2reg*net.vis_to_hid_id;
-grad.vis_to_hid_var = grad.vis_to_hid_var + pars.l2reg*net.vis_to_hid_var;
-grad.hid_id_to_id = grad.hid_id_to_id + pars.l2reg*net.hid_id_to_id;
-grad.hid_var_to_var = grad.hid_var_to_var + pars.l2reg*net.hid_var_to_var;
-grad.id_to_hid = grad.id_to_hid + pars.l2reg*net.id_to_hid;
-grad.var_to_hid = grad.var_to_hid + pars.l2reg*net.var_to_hid;
-grad.hid_to_vis = grad.hid_to_vis + pars.l2reg*net.hid_to_vis;
+grad.vis_to_hid_id1 = grad.vis_to_hid_id1 + pars.l2reg*net.vis_to_hid_id1;
+grad.hid_id1_to_hid_id2 = grad.hid_id1_to_hid_id2 + pars.l2reg*net.hid_id1_to_hid_id2;
+grad.vis_to_hid_var1 = grad.vis_to_hid_var1 + pars.l2reg*net.vis_to_hid_var1;
+grad.hid_var1_to_hid_var2 = grad.hid_var1_to_hid_var2 + pars.l2reg*net.hid_var1_to_hid_var2;
+grad.hid_id2_to_id = grad.hid_id2_to_id + pars.l2reg*net.hid_id2_to_id;
+grad.hid_var2_to_var = grad.hid_var2_to_var + pars.l2reg*net.hid_var2_to_var;
+grad.id_to_hid1 = grad.id_to_hid1 + pars.l2reg*net.id_to_hid1;
+grad.var_to_hid1 = grad.var_to_hid1 + pars.l2reg*net.var_to_hid1;
+grad.hid1_to_hid2 = grad.hid1_to_hid2 + pars.l2reg*net.hid1_to_hid2;
+grad.hid2_to_vis = grad.hid2_to_vis + pars.l2reg*net.hid2_to_vis;
 grad.id_pred = grad.id_pred + pars.l2reg*net.id_pred;
 
 end

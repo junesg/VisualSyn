@@ -1,4 +1,4 @@
-%{
+
 addpath utils;
 %% Process data
 disp('Processing data...');
@@ -33,7 +33,7 @@ K = 0; CC = 10; EPS = 0; % for norm of CC
 data = data';
 
 disp('Done.');
-%}
+
 %% Load model.
 rng('default');
 rng(2);
@@ -49,14 +49,16 @@ rng(2);
 %model = load('results/tfd_nv2304_id500_var500_l2r0.0001_eps0.001_maxit200_20150104T150747.mat');
 %model = load('results/tfd_nv2304_id500_var500_l2r0.0001_eps0.001_maxit200_20150104T173229.mat');
 %model = load('results/tfd_nv2304_id500_var500_l2r0.0001_eps0.0005_maxit200_20150104T173550.mat');
-model = load('results/tfd_nv2304_id500_var500_l2r0.0001_eps0.0001_maxit200_20150104T173528.mat');
+%model = load('results/tfd_nv2304_id500_var500_l2r0.0001_eps0.0001_maxit200_20150104T173528.mat');
+%model = load('results/tfd_nv2304_id10_var10_l2r0.0001_eps0.01_maxit100_20150104T213441.mat');
+model = load('results/tfd_nv2304_id10_var10_l2r0.0001_eps0.01_maxit100_20150104T213250.mat');
 
 net = model.weights;
 pars = model.params;
 
 % Get data.
 fold = 1;
-trainidx = folds(:,fold)==1;
+trainidx = folds(:,fold)==3;
 validx = folds(:,fold)==2;
 testidx = folds(:,fold)==3;
 

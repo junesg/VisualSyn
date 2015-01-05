@@ -9,11 +9,15 @@ Var = cell(3,1);
 
 %% Feed-forward Var.
 for i = 1:3,
-    HidVar{i} = bsxfun(@plus, net.vis_to_hid_var*X{i}, net.bias_hid_var);
+    HidVar{i} = bsxfun(@plus, net.vis_to_hid_var1*X{i}, net.bias_hid_var1);
     if ~pars.gradcheck,
         HidVar{i} = relu(HidVar{i});
     end
-    Var{i} = net.hid_var_to_var*HidVar{i};
+    HidVar{i} = bsxfun(@plus, net.hid_var1_to_hid_var2*HidVar{i}, net.bias_hid_var2);
+    if ~pars.gradcheck,
+        HidVar{i} = relu(HidVar{i});
+    end
+    Var{i} = net.hid_var2_to_var*HidVar{i};
     if strcmp(pars.enc,'sigmoid')
         Var{i} = sigmoid(Var{i});
     elseif strcmp(pars.enc,'relu'),

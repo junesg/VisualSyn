@@ -9,9 +9,15 @@ HidId = cell(3,1);
 Id = cell(3,1);
 
 for i = 1:3,
-    HidId{i} = bsxfun(@plus, net.vis_to_hid_id*X{i}, net.bias_hid_id);
-    HidId{i} = relu(HidId{i});
-    Id{i} = net.hid_id_to_id*HidId{i};
+    HidId{i} = bsxfun(@plus, net.vis_to_hid_id1*X{i}, net.bias_hid_id1);
+    if ~pars.gradcheck,
+        HidId{i} = relu(HidId{i});
+    end
+    HidId{i} = bsxfun(@plus, net.hid_id1_to_hid_id2*HidId{i}, net.bias_hid_id2);
+    if ~pars.gradcheck,
+        HidId{i} = relu(HidId{i});
+    end
+    Id{i} = net.hid_id2_to_id*HidId{i};
     if strcmp(pars.enc,'sigmoid')
         Id{i} = sigmoid(Id{i});
     elseif strcmp(pars.enc,'relu'),
