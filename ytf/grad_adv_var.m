@@ -1,7 +1,8 @@
-function [ grad, cost ] = grad_adv_var(net, pars, X1, X2, X3, Y)
+function [ grad, cost, stats ] = grad_adv_var(net, pars, X1, X2, X3, Y)
 
 numdata = size(X1,2);
 grad = struct;
+Y = double(Y);
 
 X = { X1, X2, X3 };
 HidId = cell(3,1);
@@ -21,6 +22,7 @@ end
 cost_adv = 0;
 small = 1e-9;
 grad.id_comp = 0*net.id_comp;
+stats.acc = 0;
 for i = 1:numdata,
     p12 = exp(Id{1}(:,i)'*net.id_comp*Id{2}(:,i));
     p23 = exp(Id{3}(:,i)'*net.id_comp*Id{2}(:,i));
@@ -33,6 +35,8 @@ for i = 1:numdata,
                          score*Id{1}(:,i)*Id{2}(:,i)' - ...
                          (1-score)*Id{3}(:,i)*Id{2}(:,i)');
     grad.id_comp = grad.id_comp - delta_idcomp;
+
+    stats.acc = stats.acc + (Y(i)*double(score>0.5) + (1-Y(i))*double(score<=0.5)) / numdata;
 end
 cost_adv = cost_adv / numdata;
 grad.id_comp = grad.id_comp / numdata;

@@ -5,7 +5,9 @@ pairs = makepairs(Y);
 numpair = size(pairs,1);
 numstep = 1;
 
-net = init_net_var(params, 0.01);
+net = init_net_var(params, 0.05);
+%net = init_net_var(params, 0.01);
+%net = init_net_var(params, 0.1);
 rate = params.epsilon;
 for i = 1:params.maxiter,
   % Sample 2000 pairs for this epoch.
@@ -27,13 +29,17 @@ for i = 1:params.maxiter,
     score32 = sum((Var3-Var2).^2,1);
     Yb = score12 < score32;
 
+    %cost_adv = 0;
+    %stats_adv_id.acc = 0;
+    %stats_adv_var.acc = 0;
+
     % Update adversary.
     for s = 1:numstep,
-        [ gvar, cost_adv_var ] = grad_adv_id(net, params, Xb1, Xb2, Xb3);        
+        [ gvar, cost_adv_var, stats_adv_id ] = grad_adv_id(net, params, Xb1, Xb2, Xb3);        
         if rand() < 0.5,
-            [ gid, cost_adv_id ] = grad_adv_var(net,params,Xb1,Xb2,Xb3,Yb);
+            [ gid, cost_adv_id, stats_adv_var ] = grad_adv_var(net,params,Xb1,Xb2,Xb3,Yb);
         else
-            [ gid, cost_adv_id ] = grad_adv_var(net,params,Xb3,Xb2,Xb1,~Yb);            
+            [ gid, cost_adv_id, stats_adv_var ] = grad_adv_var(net,params,Xb3,Xb2,Xb1,~Yb);            
         end
         cost_adv = cost_adv_var + cost_adv_id;
         grad = gid;
@@ -42,24 +48,26 @@ for i = 1:params.maxiter,
     end
 
     % Update network.
-    [ grad, cost ] = grad_var(net, params, Xb1, Xb2, Xb3, Yb);
+    [ grad, cost, stats_net ] = grad_var(net, params, Xb1, Xb2, Xb3, Yb);
     net = update_net_var(net, grad, rate);
 
     if mod(b,40)==0,
-      fprintf(1,'Epoch %d, batch %d of %d, rate=%.4f, cost_adv=%.4f, cost=%.4f\n', ...
-              i, b, numbatch, rate, cost_adv, cost);  
-      [ ~, Var1, Recon1 ] = net_ff_siamese(net, Xb1, params);
-      [ Id2, ~, Recon2 ] = net_ff_siamese(net, Xb2, params);
-      Transfer = net_transfer(net, Var1, Id2, params);
+      fprintf(1,'e%d,b%d/%d,r=%.4f,adv=%.4f,cost=%.4f,id2id=%.4f,var2id=%.4f,id2var=%.4f\n', ...
+              i, b, numbatch, rate, cost_adv, cost, stats_net.acc, stats_adv_id.acc, stats_adv_var.acc);
+      [ Id1, Var1, Recon1 ] = net_ff_siamese(net, Xb1, params);
+      [ Id2, Var2, Recon2 ] = net_ff_siamese(net, Xb3, params);
+      Transfer_id1_var2 = net_transfer(net, Var2, Id1, params);
+      Transfer_id2_var1 = net_transfer(net, Var1, Id2, params);
       subplot(2,2,1);
       num = min(size(Xb1,2),4);
-      display_network_nonsquare(Xb1(:,1:num));
-      subplot(2,2,2);
       display_network_nonsquare(Recon1(:,1:num));
+      subplot(2,2,2);
+      display_network_nonsquare(Transfer_id1_var2(:,1:num));
       subplot(2,2,3);
-      display_network_nonsquare(Recon2(:,1:num));
+      display_network_nonsquare(Transfer_id2_var1(:,1:num));
       subplot(2,2,4);
-      display_network_nonsquare(Transfer(:,1:num));
+      display_network_nonsquare(Recon2(:,1:num));
+      print('-dpng', params.fname_png);
     end
   end
 

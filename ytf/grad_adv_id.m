@@ -1,4 +1,4 @@
-function [ grad, cost ] = grad_adv_id(net, pars, X1, X2, X3)
+function [ grad, cost, stats ] = grad_adv_id(net, pars, X1, X2, X3)
 
 numdata = size(X1,2);
 grad = struct;
@@ -25,6 +25,7 @@ end
 cost_adv_var = 0;
 small = 1e-9;
 grad.var_comp = 0*net.var_comp;
+stats.acc = 0;
 for i = 1:numdata,
     score12 = Var{1}(:,i)'*net.var_comp*Var{2}(:,i);
     score12 = sigmoid(score12);
@@ -35,6 +36,8 @@ for i = 1:numdata,
     delta32 = score32 / numdata;
     grad.var_comp = grad.var_comp + ...
         delta12*Var{1}(:,i)*Var{2}(:,i)' + delta32*Var{3}(:,i)*Var{2}(:,i)';
+    
+    stats.acc = stats.acc + (double(score12>0.5) + double(score32<0.5))/(2.0*numdata);
 end
 
 %% L2 regularization.

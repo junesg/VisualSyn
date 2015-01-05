@@ -1,4 +1,4 @@
-function [ grad, cost ] = grad_var(net, pars, X1, X2, X3, Y)
+function [ grad, cost, stats ] = grad_var(net, pars, X1, X2, X3, Y)
 
 numdata = size(X1,2);
 grad = struct;
@@ -67,6 +67,7 @@ DeltaIdPred{1} = zeros(size(Id{1},1), numdata);
 DeltaIdPred{2} = zeros(size(Id{2},1), numdata);
 DeltaIdPred{3} = zeros(size(Id{3},1), numdata);
 grad.id_pred = 0*net.id_pred;
+stats.acc = 0;
 
 for i = 1:numdata,
     score12 = Id{1}(:,i)'*net.id_pred*Id{2}(:,i);
@@ -82,6 +83,8 @@ for i = 1:numdata,
     DeltaIdPred{3}(:,i) = delta32*net.id_pred*Id{2}(:,i);
     DeltaIdPred{2}(:,i) = ...
         delta12*net.id_pred'*Id{1}(:,i) + delta32*net.id_pred'*Id{3}(:,i);
+
+    stats.acc = stats.acc + (double(score12>0.5) + double(score32<0.5))/(2.0*numdata);
 end
 
 %% Cost Var adv.
@@ -178,6 +181,7 @@ cost_l2r = 0.5*pars.l2reg*(net.vis_to_hid_id(:)'*net.vis_to_hid_id(:) + ...
                            net.hid_id_to_id(:)'*net.hid_id_to_id(:) + ...
                            net.hid_var_to_var(:)'*net.hid_var_to_var(:) + ...
                            net.id_to_hid(:)'*net.id_to_hid(:) + ...
+                           net.id_pred(:)'*net.id_pred(:) + ...
                            net.var_to_hid(:)'*net.var_to_hid(:) + ...
                            net.hid_to_vis(:)'*net.hid_to_vis(:));
 
@@ -190,5 +194,6 @@ grad.hid_var_to_var = grad.hid_var_to_var + pars.l2reg*net.hid_var_to_var;
 grad.id_to_hid = grad.id_to_hid + pars.l2reg*net.id_to_hid;
 grad.var_to_hid = grad.var_to_hid + pars.l2reg*net.var_to_hid;
 grad.hid_to_vis = grad.hid_to_vis + pars.l2reg*net.hid_to_vis;
+grad.id_pred = grad.id_pred + pars.l2reg*net.id_pred;
 
 end

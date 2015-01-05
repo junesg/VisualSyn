@@ -7,6 +7,7 @@ tmp2 = net.id_comp;
 fields = fieldnames(grad);
 for f = 1:numel(fields),
     net.(fields{f}) = net.(fields{f}) - rate * grad.(fields{f});
+    %net.(fields{f}) = net.(fields{f}) + rate * grad.(fields{f});
 end
 
 net.var_comp = tmp1;

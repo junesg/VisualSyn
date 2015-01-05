@@ -1,4 +1,4 @@
-
+%{
 addpath utils;
 %% Process data
 disp('Processing data...');
@@ -33,7 +33,7 @@ K = 0; CC = 10; EPS = 0; % for norm of CC
 data = data';
 
 disp('Done.');
-
+%}
 %% Load model.
 rng('default');
 rng(2);
@@ -45,7 +45,11 @@ rng(2);
 %model = load('results/tfd_nv2304_id400_var400_l2r0.0001_eps0.01_maxit300_20141231T171337.mat');
 %model = load('results/tfd_nv2304_id500_var400_l2r0.0001_eps0.01_maxit100_20141231T212648.mat');
 
-model = load('results/tfd_nv2304_id500_var500_l2r0.0001_eps0.001_maxit200_20150101T135730.mat');
+%model = load('results/tfd_nv2304_id500_var500_l2r0.0001_eps0.001_maxit200_20150101T135730.mat');
+%model = load('results/tfd_nv2304_id500_var500_l2r0.0001_eps0.001_maxit200_20150104T150747.mat');
+%model = load('results/tfd_nv2304_id500_var500_l2r0.0001_eps0.001_maxit200_20150104T173229.mat');
+%model = load('results/tfd_nv2304_id500_var500_l2r0.0001_eps0.0005_maxit200_20150104T173550.mat');
+model = load('results/tfd_nv2304_id500_var500_l2r0.0001_eps0.0001_maxit200_20150104T173528.mat');
 
 net = model.weights;
 pars = model.params;
@@ -73,18 +77,24 @@ X2 = Xtrain(:, sample_nonneutral);
 [ Id1, Var1, Recon1 ] = net_ff_siamese(net, X1, pars);
 [ Id2, Var2, Recon2 ] = net_ff_siamese(net, X2, pars);
 
-XT = net_transfer(net, Var2, Id1, pars);
-XR = net_transfer(net, Var1, Id1, pars);
+X_id1_var1 = net_transfer(net, Var1, Id1, pars);
+X_id1_var2 = net_transfer(net, Var1, Id2, pars);
+X_id2_var1 = net_transfer(net, Var2, Id1, pars);
+X_id2_var2 = net_transfer(net, Var2, Id2, pars);
+
+%XT = net_transfer(net, Var2, Id1, pars);
+%XR = net_transfer(net, Var1, Id1, pars);
 
 Xvis = zeros(4*48, ns*48);
 for i = 1:ns,
     idx = (1+(i-1)*48):(i*48);
     Xvis(:,idx) = ...
-        [ reshape(X1(:,i),[48 48]); ...
-          reshape(X2(:,i),[48 48]); ...
-          reshape(XR(:,i),[48 48]); ...
-          reshape(XT(:,i),[48 48]) ];
+        [ reshape(X_id1_var1(:,i),[48 48]); ...
+          reshape(X_id1_var2(:,i),[48 48]); ...
+          reshape(X_id2_var2(:,i),[48 48]); ...
+          reshape(X_id2_var1(:,i),[48 48]) ];
 end
 
 figure(1);
-imagesc(Xvis,[-.7 .7]); colormap gray; axis off;
+%imagesc(Xvis,[-.7 .7]); colormap gray; axis off;
+imagesc(Xvis); colormap gray; axis off;
